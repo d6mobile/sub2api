@@ -18,6 +18,23 @@ import (
 // installMutex prevents concurrent installation attempts (TOCTOU protection)
 var installMutex sync.Mutex
 
+var (
+	onCompleteFunc func()
+	onCompleteMu   sync.Mutex
+)
+
+// SetOnComplete registers a callback to be called when setup installation completes successfully.
+func SetOnComplete(fn func()) {
+	onCompleteMu.Lock()
+	defer onCompleteMu.Unlock()
+	onCompleteFunc = fn
+}
+
+// IsInstalled reports whether the system has already been installed (i.e. no longer needs setup).
+func IsInstalled() bool {
+	return !NeedsSetup()
+}
+
 // RegisterRoutes registers setup wizard routes
 func RegisterRoutes(r *gin.Engine) {
 	setup := r.Group("/setup")
@@ -357,11 +374,19 @@ func install(c *gin.Context) {
 	go func() {
 		// Wait a moment to ensure the response is sent
 		time.Sleep(500 * time.Millisecond)
-		sysutil.RestartServiceAsync()
+		onCompleteMu.Lock()
+		fn := onCompleteFunc
+		onCompleteMu.Unlock()
+		if fn != nil {
+			fn()
+		} else {
+			sysutil.RestartServiceAsync()
+		}
 	}()
 
 	response.Success(c, gin.H{
-		"message": "Installation completed successfully. Service will restart automatically.",
-		"restart": true,
+		"message":  "Installation completed successfully. Redirecting to login...",
+		"restart":  false,
+		"redirect": "/login",
 	})
 }

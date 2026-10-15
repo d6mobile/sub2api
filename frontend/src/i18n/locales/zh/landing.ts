@@ -249,7 +249,8 @@ export default {
       completed: '安装完成！',
       redirecting: '正在跳转到登录页面...',
       restarting: '服务正在重启，请稍候...',
-      timeout: '服务重启时间超出预期，请手动刷新页面。'
+      timeout: '服务重启时间超出预期，请手动刷新页面。',
+      goToLogin: '前往登录'
     }
   },
 

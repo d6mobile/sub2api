@@ -438,6 +438,16 @@
                     : t('setup.status.restarting')
                 }}
               </p>
+              <div v-if="installSuccess" class="mt-3">
+                <button
+                  type="button"
+                  @click="goToLogin"
+                  class="btn btn-primary"
+                >
+                  {{ t('setup.status.goToLogin') }}
+                  <Icon name="arrowRight" size="sm" class="ml-2" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -499,7 +509,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { testDatabase, testRedis, install, type InstallRequest } from '@/api/setup'
 import { buildGatewayUrl } from '@/api/client'
@@ -508,6 +518,36 @@ import Toggle from '@/components/common/Toggle.vue'
 import Icon from '@/components/icons/Icon.vue'
 
 const { t } = useI18n()
+
+let fallbackRedirectTimer: ReturnType<typeof setTimeout> | null = null
+let redirectTimer: ReturnType<typeof setTimeout> | null = null
+let pollTimer: ReturnType<typeof setTimeout> | null = null
+let abortController: AbortController | null = null
+let isUnmounted = false
+
+function clearAllTimers() {
+  if (fallbackRedirectTimer) {
+    clearTimeout(fallbackRedirectTimer)
+    fallbackRedirectTimer = null
+  }
+  if (redirectTimer) {
+    clearTimeout(redirectTimer)
+    redirectTimer = null
+  }
+  if (pollTimer) {
+    clearTimeout(pollTimer)
+    pollTimer = null
+  }
+  if (abortController) {
+    abortController.abort()
+    abortController = null
+  }
+}
+
+onBeforeUnmount(() => {
+  isUnmounted = true
+  clearAllTimers()
+})
 
 const steps = computed(() => [
   { id: 'database', title: t('setup.database.title') },
@@ -643,44 +683,76 @@ async function performInstall() {
   }
 }
 
+function goToLogin() {
+  if (isUnmounted) return
+  clearAllTimers()
+  window.location.href = '/login'
+}
+
 // Wait for service to restart and become available
 async function waitForServiceRestart() {
+  fallbackRedirectTimer = setTimeout(() => {
+    goToLogin()
+  }, 5000)
+
   const maxAttempts = 60 // Increase to 60 attempts, ~60 seconds max
   const interval = 1000 // 1 second between attempts
 
-  // Wait a moment for the service to start restarting
-  await new Promise((resolve) => setTimeout(resolve, 3000))
+  // Wait a moment for the service to start restarting (1s instead of 3s)
+  await new Promise((resolve) => {
+    pollTimer = setTimeout(resolve, 1000)
+  })
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (isUnmounted) return
+
+    let requestTimeout: ReturnType<typeof setTimeout> | null = null
     try {
+      abortController = new AbortController()
+      const currentAbortController = abortController
+      requestTimeout = setTimeout(() => {
+        currentAbortController.abort()
+      }, 2500)
+
       // Use setup status endpoint as it tells us the real mode
       // Service might return 404 or connection refused while restarting
       const response = await fetch(buildGatewayUrl('/setup/status'), {
         method: 'GET',
-        cache: 'no-store'
+        cache: 'no-store',
+        signal: currentAbortController.signal
       })
 
       if (response.ok) {
         const data = await response.json()
         // If needs_setup is false, service has restarted in normal mode
         if (data.data && !data.data.needs_setup) {
+          clearAllTimers()
+          if (isUnmounted) return
           serviceReady.value = true
-          // Redirect to login page after a short delay
-          setTimeout(() => {
-            window.location.href = '/login'
-          }, 1500)
+          redirectTimer = setTimeout(() => {
+            goToLogin()
+          }, 1000)
           return
         }
       }
     } catch {
       // Service not ready or network error during restart, continue polling
+    } finally {
+      if (requestTimeout) {
+        clearTimeout(requestTimeout)
+      }
+      abortController = null
     }
 
-    await new Promise((resolve) => setTimeout(resolve, interval))
+    if (isUnmounted) return
+
+    await new Promise((resolve) => {
+      pollTimer = setTimeout(resolve, interval)
+    })
   }
 
   // If we reach here, service didn't restart in time
-  // Show a message to refresh manually
-  errorMessage.value = t('setup.status.timeout')
+  clearAllTimers()
+  goToLogin()
 }
 </script>

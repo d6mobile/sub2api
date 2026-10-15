@@ -86,7 +86,10 @@ func main() {
 		} else {
 			log.Println("First run detected, starting setup wizard...")
 			runSetupServer()
-			return
+			if !setup.IsInstalled() {
+				return
+			}
+			log.Println("Setup completed successfully. Transitioning to main application server...")
 		}
 	}
 
@@ -126,9 +129,37 @@ func runSetupServer() {
 		Protocols:         protocols,
 	}
 
+	setupComplete := make(chan struct{})
+	setup.SetOnComplete(func() {
+		close(setupComplete)
+	})
+
+	shutdownDone := make(chan struct{})
+	go func() {
+		<-setupComplete
+		log.Println("Setup completion signal received, shutting down setup wizard server...")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Setup server graceful shutdown error: %v, forcing close", err)
+			_ = server.Close()
+		}
+		close(shutdownDone)
+	}()
+
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("Failed to start setup server: %v", err)
 	}
+
+	// Ensure all setup server connections and shutdown cleanup have completed
+	select {
+	case <-shutdownDone:
+		log.Println("Setup wizard server shutdown completed.")
+	case <-time.After(6 * time.Second):
+		log.Println("Setup wizard shutdown wait timed out, forcing close.")
+		_ = server.Close()
+	}
+	log.Println("Setup wizard server stopped cleanly.")
 }
 
 func runMainServer() {

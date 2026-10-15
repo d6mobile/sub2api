@@ -20,4 +20,54 @@ if [ "${1#-}" != "$1" ]; then
     set -- /app/sub2api "$@"
 fi
 
-exec "$@"
+# If the command to run is the main server binary /app/sub2api without subcommands,
+# loop on clean exit (exit code 0) so container platforms like Railway/Docker
+# do not terminate the container if the process exits for a restart.
+# Signals (SIGTERM/SIGINT) are trapped and forwarded to ensure graceful container shutdown.
+if [ "$1" = "/app/sub2api" ] && [ $# -eq 1 ]; then
+    child_pid=""
+    stop_requested=0
+
+    handle_term() {
+        stop_requested=1
+        if [ -n "$child_pid" ]; then
+            kill -TERM "$child_pid" 2>/dev/null || true
+        fi
+    }
+    handle_int() {
+        stop_requested=1
+        if [ -n "$child_pid" ]; then
+            kill -INT "$child_pid" 2>/dev/null || true
+        fi
+    }
+    trap handle_term TERM
+    trap handle_int INT
+
+    while [ $stop_requested -eq 0 ]; do
+        "$@" &
+        child_pid=$!
+        # set +e: the wait below is interrupted by the TERM/INT trap and then
+        # returns 128+signal, which would trigger errexit and abort the script
+        # with 143 before the stop_requested check is reached.
+        set +e
+        wait "$child_pid" 2>/dev/null
+        exit_code=$?
+        set -e
+
+        # If container was requested to stop, exit immediately
+        if [ $stop_requested -eq 1 ]; then
+            exit 0
+        fi
+
+        # If process exited cleanly (like restart after setup), restart server
+        if [ $exit_code -eq 0 ]; then
+            echo "Sub2API process exited with 0. Restarting server in 1s..."
+            sleep 1
+        else
+            echo "Sub2API process exited with code $exit_code."
+            exit $exit_code
+        fi
+    done
+else
+    exec "$@"
+fi

@@ -249,7 +249,8 @@ export default {
       completed: 'Installation completed!',
       redirecting: 'Redirecting to login page...',
       restarting: 'Service is restarting, please wait...',
-      timeout: 'Service restart is taking longer than expected. Please refresh the page manually.'
+      timeout: 'Service restart is taking longer than expected. Please refresh the page manually.',
+      goToLogin: 'Go to Login'
     }
   },
 
