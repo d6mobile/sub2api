@@ -1,0 +1,75 @@
+# =============================================================================
+# Sub2API Local Source-Build Override
+# =============================================================================
+# Overlay for deploy/docker-compose.yml that builds the app image from the
+# pinned local source tree instead of pulling a released image, and keeps the
+# whole stack private to this host.
+#
+# Usage (from the repository root):
+#   docker compose -p sub2api-local \
+#     --env-file /home/duydv/.config/sub2api-local/deployment.env \
+#     -f deploy/docker-compose.yml \
+#     -f deploy/docker-compose.local-build.yml \
+#     build
+#   docker compose -p sub2api-local \
+#     --env-file /home/duydv/.config/sub2api-local/deployment.env \
+#     -f deploy/docker-compose.yml \
+#     -f deploy/docker-compose.local-build.yml \
+#     up -d
+#
+# Design notes:
+# - Only build/image identity, host binding, container names, and resource
+#   names are overridden. Every security and runtime default declared in
+#   deploy/docker-compose.yml (security_opt no-new-privileges, ulimits,
+#   healthchecks, depends_on ordering, environment, named volume mounts) is
+#   inherited unchanged.
+# - The base compose file maps "${BIND_HOST:-0.0.0.0}:${SERVER_PORT:-8080}"
+#   to the host. Compose concatenates list entries across override files, so
+#   the ports list is replaced with !override to guarantee the only host
+#   publications are loopback 127.0.0.1 and the WireGuard VPN address
+#   10.8.0.4 (wg0). Both use the existing ${SERVER_PORT:-8080} interpolation.
+#   Never 0.0.0.0 and never a LAN address. The 10.8.0.4 binding requires the
+#   wg0 interface to own that IP at container start, otherwise the port
+#   publication fails; WireGuard must be up first.
+# - PostgreSQL and Redis already publish no host ports upstream; that is not
+#   re-added here.
+# =============================================================================
+
+services:
+  sub2api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: sub2api-local:98d86915
+    pull_policy: never
+    container_name: sub2api-local
+    # Replace (not append to) the base ports list: loopback plus VPN address.
+    ports: !override
+      - "127.0.0.1:${SERVER_PORT:-8080}:8080"
+      - "10.8.0.4:${SERVER_PORT:-8080}:8080"
+
+  postgres:
+    # Namespaced to the sub2api-local project so it cannot collide with another
+    # deployment's globally-named sub2api-postgres container.
+    container_name: sub2api-local-postgres
+
+  redis:
+    # Namespaced to the sub2api-local project (upstream default: sub2api-redis).
+    container_name: sub2api-local-redis
+
+volumes:
+  # Stable, conflict-free names independent of the Compose project prefix.
+  sub2api_data:
+    name: sub2api-local-data
+    driver: local
+  postgres_data:
+    name: sub2api-local-postgres-data
+    driver: local
+  redis_data:
+    name: sub2api-local-redis-data
+    driver: local
+
+networks:
+  sub2api-network:
+    name: sub2api-local-net
+    driver: bridge
