@@ -90,7 +90,8 @@ describe('GroupI18nField', () => {
     expect(menuItems(wrapper).map((item) => [item.attributes('data-locale'), item.text()])).toEqual([
       ['default', 'admin.groups.i18nField.default'],
       ['en', 'admin.groups.i18nField.edit:English'],
-      ['zh', 'admin.groups.i18nField.add:中文']
+      ['zh', 'admin.groups.i18nField.add:中文'],
+      ['vi', 'admin.groups.i18nField.add:Tiếng Việt']
     ])
   })
 
@@ -184,10 +185,73 @@ describe('GroupI18nField', () => {
     expect(state.text).toBe('号池')
   })
 
+  it('edits an optional Vietnamese name without changing other content', async () => {
+    const { wrapper, state } = mountField({
+      text: 'Original',
+      i18n: { en: { name: 'Standard' }, vi: { description: 'Mô tả giữ nguyên' } }
+    })
+    await trigger(wrapper).trigger('click')
+    expect(menuItems(wrapper).map((item) => item.attributes('data-locale'))).toEqual(['default', 'en', 'zh', 'vi'])
+    await wrapper.get('button[data-locale="vi"]').trigger('click')
+
+    expect(wrapper.get('input').element.value).toBe('')
+    await wrapper.get('input').setValue('Tiêu chuẩn')
+    expect(state.i18n).toEqual({
+      en: { name: 'Standard' }, vi: { description: 'Mô tả giữ nguyên', name: 'Tiêu chuẩn' }
+    })
+    expect(state.text).toBe('Original')
+    await choose(wrapper, 'default')
+    expect(wrapper.get('input').element.value).toBe('Original')
+    await choose(wrapper, 'vi')
+    expect(wrapper.get('input').element.value).toBe('Tiêu chuẩn')
+  })
+
+  it('edits a Vietnamese description while preserving its name and other languages', async () => {
+    const { wrapper, state } = mountField({
+      text: 'Original description',
+      i18n: { en: { description: 'Standard pool' }, vi: { name: 'Tiêu chuẩn' } }
+    }, { field: 'description', multiline: true })
+    await trigger(wrapper).trigger('click')
+    expect(menuItems(wrapper).map((item) => item.attributes('data-locale'))).toContain('vi')
+    await wrapper.get('button[data-locale="vi"]').trigger('click')
+
+    expect(wrapper.get('textarea').element.value).toBe('')
+    await wrapper.get('textarea').setValue('Nhóm tiêu chuẩn')
+    expect(wrapper.findAll('textarea')).toHaveLength(1)
+    expect(state.i18n).toEqual({
+      en: { description: 'Standard pool' }, vi: { name: 'Tiêu chuẩn', description: 'Nhóm tiêu chuẩn' }
+    })
+    expect(state.text).toBe('Original description')
+    await choose(wrapper, 'default')
+    expect(wrapper.get('textarea').element.value).toBe('Original description')
+    await choose(wrapper, 'vi')
+    expect(wrapper.get('textarea').element.value).toBe('Nhóm tiêu chuẩn')
+  })
+
+  it('keeps a group without Vietnamese valid and creates no translation merely by selecting it', async () => {
+    const { wrapper, state } = mountField({
+      text: 'Original', i18n: { en: { name: 'Standard' } }
+    }, { required: true })
+    expect(wrapper.get('input').element.validity.valid).toBe(true)
+    await trigger(wrapper).trigger('click')
+    expect(menuItems(wrapper).map((item) => item.attributes('data-locale'))).toContain('vi')
+    expect(state.i18n).toEqual({ en: { name: 'Standard' } })
+    await wrapper.get('button[data-locale="vi"]').trigger('click')
+
+    expect(wrapper.get('input').element.value).toBe('')
+    expect(wrapper.get('input').attributes('required')).toBeUndefined()
+    expect(wrapper.get('input').element.validity.valid).toBe(true)
+    expect(state.i18n).toEqual({ en: { name: 'Standard' } })
+    await choose(wrapper, 'default')
+    expect(wrapper.get('input').element.value).toBe('Original')
+    expect(state.text).toBe('Original')
+    expect(state.i18n).toEqual({ en: { name: 'Standard' } })
+  })
+
   it('closes the menu when clicking elsewhere', async () => {
     const { wrapper } = mountField({ text: '标准', i18n: {} })
     await trigger(wrapper).trigger('click')
-    expect(menuItems(wrapper)).toHaveLength(3)
+    expect(menuItems(wrapper)).toHaveLength(4)
 
     document.body.click()
     await wrapper.vm.$nextTick()

@@ -340,7 +340,7 @@ export function formatTime(date: string | Date | null | undefined): string {
  * @returns 格式化后的字符串，如 "12,345"
  */
 export function formatNumberLocaleString(num: number): string {
-  return num.toLocaleString()
+  return num.toLocaleString(getLocale())
 }
 
 /**

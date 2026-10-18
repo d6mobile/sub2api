@@ -13,6 +13,11 @@ function mountPagination() {
 }
 
 describe('pagination jump input', () => {
+  it('uses the localized accessibility label for the pagination navigation', () => {
+    const wrapper = mountPagination()
+    expect(wrapper.get('nav').attributes('aria-label')).toBe('common.accessibility.pagination')
+  })
+
   it.each(['click', 'enter'])('jumps to the entered numeric page using %s', async (action) => {
     const wrapper = mountPagination()
     const input = wrapper.get('input[type="number"]')

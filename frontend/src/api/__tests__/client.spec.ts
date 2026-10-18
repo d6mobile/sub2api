@@ -260,51 +260,206 @@ describe('API Client', () => {
       )
     })
 
-    it('部署与运营合规未确认时广播事件且保留登录态', async () => {
-      localStorage.setItem('auth_token', 'admin-token')
+    describe.each(['/admin/ops/errors', '/dashboard'])('OPS_DISABLED at %s', (pathname) => {
+      const cases: {
+        name: string
+        status: number
+        body: { reason?: unknown; message?: string }
+        disabled: boolean
+      }[] = [
+        {
+          name: 'localized message with stable reason', status: 404,
+          body: { reason: 'OPS_DISABLED', message: 'Giám sát vận hành đã bị tắt' }, disabled: true,
+        },
+        {
+          name: 'missing message with stable reason', status: 404,
+          body: { reason: 'OPS_DISABLED' }, disabled: true,
+        },
+        {
+          name: 'legacy message without reason', status: 404,
+          body: { message: 'Ops monitoring is disabled' }, disabled: true,
+        },
+        {
+          name: 'different supplied reason', status: 404,
+          body: { reason: 'OTHER_REASON', message: 'Ops monitoring is disabled' }, disabled: false,
+        },
+        {
+          name: 'empty supplied reason', status: 404,
+          body: { reason: '', message: 'Ops monitoring is disabled' }, disabled: false,
+        },
+        {
+          name: 'null supplied reason', status: 404,
+          body: { reason: null, message: 'Ops monitoring is disabled' }, disabled: false,
+        },
+        {
+          name: 'false supplied reason', status: 404,
+          body: { reason: false, message: 'Ops monitoring is disabled' }, disabled: false,
+        },
+        {
+          name: 'zero supplied reason', status: 404,
+          body: { reason: 0, message: 'Ops monitoring is disabled' }, disabled: false,
+        },
+        {
+          name: 'case-sensitive reason', status: 404,
+          body: { reason: 'ops_disabled', message: 'Ops monitoring is disabled' }, disabled: false,
+        },
+        {
+          name: 'unrelated message without reason', status: 404,
+          body: { message: 'Another feature is unavailable' }, disabled: false,
+        },
+        {
+          name: 'stable reason at another status', status: 403,
+          body: { reason: 'OPS_DISABLED', message: 'Ops monitoring is disabled' }, disabled: false,
+        },
+      ]
+
+      it.each(cases)('$name', async ({ status, body, disabled }) => {
+        const originalLocation = window.location
+        const listener = vi.fn()
+        const url = '/admin/ops/dashboard'
+        const data = {
+          code: 'FIXTURE_UPSTREAM_CODE',
+          error: 'fixture-error-detail',
+          metadata: { source: 'ops-fixture' },
+          ...body,
+        }
+        const authState = {
+          auth_token: 'access-fixture',
+          refresh_token: 'refresh-fixture',
+          auth_user: JSON.stringify({ id: 7 }),
+          token_expires_at: '123',
+        }
+        const refresh = vi.spyOn(await import('@/api/tokenRefresh'), 'refreshAuthTokens')
+          .mockRejectedValue(new Error('Unexpected OPS token refresh'))
+
+        Object.defineProperty(window, 'location', {
+          value: { ...originalLocation, pathname, href: pathname },
+          writable: true,
+        })
+        window.addEventListener('ops-monitoring-disabled', listener)
+
+        try {
+          for (const [key, value] of Object.entries(authState)) {
+            localStorage.setItem(key, value)
+          }
+          localStorage.setItem('ops_monitoring_enabled_cached', 'true')
+          sessionStorage.setItem('auth_expired', 'fixture-session-marker')
+          apiClient.defaults.adapter = vi.fn().mockRejectedValue({
+            response: { status, data },
+            config: { url },
+            message: 'HTTP fixture failure',
+          })
+
+          await expect(apiClient.get(url)).rejects.toStrictEqual(disabled ? {
+            status,
+            code: 'OPS_DISABLED',
+            message: data.message || 'HTTP fixture failure',
+            url,
+          } : {
+            status,
+            code: data.code,
+            reason: data.reason,
+            error: data.error,
+            message: data.message || 'HTTP fixture failure',
+            metadata: data.metadata,
+          })
+          expect(localStorage.getItem('ops_monitoring_enabled_cached')).toBe(disabled ? 'false' : 'true')
+          expect(listener).toHaveBeenCalledTimes(disabled ? 1 : 0)
+          expect(window.location.href).toBe(
+            disabled && pathname === '/admin/ops/errors' ? '/admin/settings' : pathname
+          )
+          for (const [key, value] of Object.entries(authState)) {
+            expect(localStorage.getItem(key)).toBe(value)
+          }
+          expect(sessionStorage.getItem('auth_expired')).toBe('fixture-session-marker')
+          expect(refresh).not.toHaveBeenCalled()
+        } finally {
+          window.removeEventListener('ops-monitoring-disabled', listener)
+          Object.defineProperty(window, 'location', { value: originalLocation, writable: true })
+        }
+      })
+    })
+
+    it.each([
+      {
+        name: 'legacy English', status: 423, code: 'ADMIN_COMPLIANCE_ACK_REQUIRED',
+        message: 'administrator compliance acknowledgement is required', compliance: true,
+      },
+      {
+        name: 'Vietnamese', status: 423, code: 'ADMIN_COMPLIANCE_ACK_REQUIRED',
+        message: 'Quản trị viên cần xác nhận tuân thủ', compliance: true,
+      },
+      {
+        name: 'other code despite legacy wording', status: 423, code: 'OTHER_POLICY',
+        message: 'administrator compliance acknowledgement is required', compliance: false,
+      },
+      {
+        name: 'other status despite compliance code', status: 403, code: 'ADMIN_COMPLIANCE_ACK_REQUIRED',
+        message: 'Quản trị viên cần xác nhận tuân thủ', compliance: false,
+      },
+    ])('admin compliance: $name', async ({ status, code, message, compliance }) => {
+      const originalLocation = window.location
       const listener = vi.fn()
+      const metadata = {
+        version: 'v2026.06.10',
+        document_path_zh: 'docs/legal/admin-compliance.zh.md',
+        document_path_en: 'docs/legal/admin-compliance.en.md',
+        document_url_zh: 'https://example.invalid/legal/admin-compliance.zh.md',
+        document_url_en: 'https://example.invalid/legal/admin-compliance.en.md',
+      }
+      const authState = {
+        auth_token: 'admin-token',
+        refresh_token: 'fixture-refresh-token',
+        auth_user: JSON.stringify({ id: 1, role: 'admin' }),
+        token_expires_at: 'fixture-expiry',
+      }
+      const refresh = vi.spyOn(await import('@/api/tokenRefresh'), 'refreshAuthTokens')
+        .mockRejectedValue(new Error('Unexpected compliance token refresh'))
+
+      Object.defineProperty(window, 'location', {
+        value: { ...originalLocation, pathname: '/admin/users', href: '/admin/users' },
+        writable: true,
+      })
       window.addEventListener('admin-compliance-required', listener)
 
-      const adapter = vi.fn().mockRejectedValue({
-        response: {
-          status: 423,
-          data: {
-            code: 'ADMIN_COMPLIANCE_ACK_REQUIRED',
-            message: 'administrator compliance acknowledgement is required',
-            metadata: {
-              version: 'v2026.06.10',
-              document_path_zh: 'docs/legal/admin-compliance.zh.md',
-              document_path_en: 'docs/legal/admin-compliance.en.md',
-            },
+      try {
+        for (const [key, value] of Object.entries(authState)) {
+          localStorage.setItem(key, value)
+        }
+        sessionStorage.setItem('auth_expired', 'fixture-session-marker')
+        apiClient.defaults.adapter = vi.fn().mockRejectedValue({
+          response: {
+            status,
+            data: { code, message, metadata: { ...metadata } },
           },
-        },
-        config: {
-          url: '/admin/users',
-          headers: { Authorization: 'Bearer admin-token' },
-        },
-        code: 'ERR_BAD_REQUEST',
-      })
-      apiClient.defaults.adapter = adapter
-
-      await expect(apiClient.get('/admin/users')).rejects.toEqual(
-        expect.objectContaining({
-          status: 423,
-          code: 'ADMIN_COMPLIANCE_ACK_REQUIRED',
-          metadata: expect.objectContaining({
-            version: 'v2026.06.10',
-          }),
+          config: {
+            url: '/admin/users',
+            headers: { Authorization: 'Bearer admin-token' },
+          },
+          code: 'ERR_BAD_REQUEST',
         })
-      )
 
-      expect(listener).toHaveBeenCalledTimes(1)
-      expect((listener.mock.calls[0][0] as CustomEvent).detail).toEqual(
-        expect.objectContaining({
-          version: 'v2026.06.10',
-        })
-      )
-      expect(localStorage.getItem('auth_token')).toBe('admin-token')
+        const request = apiClient.get('/admin/users')
+        if (compliance) {
+          await expect(request).rejects.toStrictEqual({ status, code, message, metadata })
+          expect(listener).toHaveBeenCalledTimes(1)
+          expect((listener.mock.calls[0][0] as CustomEvent).detail).toEqual(metadata)
+        } else {
+          await expect(request).rejects.toMatchObject({ status, code, message, metadata })
+          expect(listener).not.toHaveBeenCalled()
+        }
 
-      window.removeEventListener('admin-compliance-required', listener)
+        expect(localStorage.getItem('auth_token')).toBe('admin-token')
+        for (const [key, value] of Object.entries(authState)) {
+          expect(localStorage.getItem(key)).toBe(value)
+        }
+        expect(sessionStorage.getItem('auth_expired')).toBe('fixture-session-marker')
+        expect(refresh).not.toHaveBeenCalled()
+        expect(window.location.href).toBe('/admin/users')
+      } finally {
+        window.removeEventListener('admin-compliance-required', listener)
+        Object.defineProperty(window, 'location', { value: originalLocation, writable: true })
+      }
     })
   })
 

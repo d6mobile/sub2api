@@ -50,7 +50,7 @@ import DataTable from '@/components/common/DataTable.vue'
 import OrderStatusBadge from '@/components/payment/OrderStatusBadge.vue'
 import { currencySymbol } from '@/components/payment/currency'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const props = defineProps<{
   orders: PaymentOrder[]
@@ -58,7 +58,7 @@ const props = defineProps<{
   showUser?: boolean
 }>()
 
-function formatDate(dateStr: string) { return new Date(dateStr).toLocaleString() }
+function formatDate(dateStr: string) { return new Date(dateStr).toLocaleString(locale.value) }
 
 const creditedAmountSymbol = currencySymbol('USD')
 

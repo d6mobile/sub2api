@@ -741,7 +741,7 @@
                     <button
                       type="button"
                       class="btn btn-secondary p-2"
-                      title="Copy URL"
+                      :title="t('admin.accounts.oauth.openai.copySessionUrl')"
                       @click="handleCopyUrl"
                     >
                       <svg

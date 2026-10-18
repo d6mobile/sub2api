@@ -217,3 +217,48 @@ describe('Select remote search', () => {
     expect(labels).toEqual(['Alpha account'])
   })
 })
+
+describe('Select accessibility labels', () => {
+  const mountSelect = (props: Record<string, unknown> = {}) => {
+    const wrapper = mount(Select, {
+      props: {
+        modelValue: null,
+        options: [{ value: 'alpha', label: 'Alpha account' }],
+        ...props,
+      },
+    })
+    unmountWrapper = () => wrapper.unmount()
+    return wrapper
+  }
+
+  it('uses the translated accessibility label when ariaLabel is omitted', () => {
+    const wrapper = mountSelect()
+
+    expect(wrapper.get('.select-trigger').attributes('aria-label')).toBe('common.accessibility.selectOption')
+    expect(wrapper.get('.select-value').text()).toBe('common.selectOption')
+  })
+
+  it('preserves a custom ariaLabel', () => {
+    const wrapper = mountSelect({ ariaLabel: 'Custom' })
+
+    expect(wrapper.get('.select-trigger').attributes('aria-label')).toBe('Custom')
+  })
+
+  it('preserves an explicitly empty ariaLabel', () => {
+    const wrapper = mountSelect({ ariaLabel: '' })
+
+    expect(wrapper.get('.select-trigger').attributes('aria-label')).toBe('')
+  })
+
+  it('uses the translated clear label and still clears the selected value', async () => {
+    const wrapper = mountSelect({ modelValue: 'alpha', clearable: true, disabled: false })
+    const clearButton = wrapper.get('.select-clear')
+
+    expect(clearButton.attributes('aria-label')).toBe('common.accessibility.clearSelection')
+
+    await clearButton.trigger('click')
+
+    expect(wrapper.emitted('update:modelValue')).toEqual([[null]])
+    expect(wrapper.emitted('change')).toEqual([[null, null]])
+  })
+})

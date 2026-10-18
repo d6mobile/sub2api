@@ -1662,6 +1662,13 @@ export default {
       reAuthorizedSuccess: '账号重新授权成功',
       // Test Modal
       testAccountConnection: '测试账号连接',
+      testHttpStatusError: 'HTTP error! status: {status}',
+      legacyTest: {
+        noResponseBody: 'No response body',
+        unknownError: 'Unknown error',
+        errorPrefix: 'Error: {message}',
+        testFailed: 'Test failed',
+      },
       errorPrefix: '错误：{message}',
       imagePreviewAlt: '测试图片 {index}',
       imageLightboxAlt: '图片预览',

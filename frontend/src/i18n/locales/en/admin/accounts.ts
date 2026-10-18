@@ -1572,6 +1572,13 @@ export default {
       reAuthorizedSuccess: 'Account re-authorized successfully',
       // Test Modal
       testAccountConnection: 'Test Account Connection',
+      testHttpStatusError: 'HTTP error! status: {status}',
+      legacyTest: {
+        noResponseBody: 'No response body',
+        unknownError: 'Unknown error',
+        errorPrefix: 'Error: {message}',
+        testFailed: 'Test failed',
+      },
       errorPrefix: 'Error: {message}',
       imagePreviewAlt: 'Test image {index}',
       imageLightboxAlt: 'Image preview',

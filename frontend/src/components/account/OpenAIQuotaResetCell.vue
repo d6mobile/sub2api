@@ -201,7 +201,7 @@ const emit = defineEmits<{
   'account-updated': [account: Account]
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 // Visible only for OpenAI OAuth accounts.
 const visible = computed(() => props.account.platform === 'openai' && props.account.type === 'oauth')
@@ -404,7 +404,7 @@ const formatResetCreditExpiry = (value: string, style: 'short' | 'full'): string
     options.year = 'numeric'
   }
 
-  return new Intl.DateTimeFormat(undefined, options).format(date)
+  return new Intl.DateTimeFormat(locale.value, options).format(date)
 }
 
 const extractErrorMessage = (e: unknown): string => {

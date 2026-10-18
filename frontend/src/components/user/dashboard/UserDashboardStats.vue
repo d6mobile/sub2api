@@ -247,7 +247,7 @@ const props = defineProps<{
   isSimple: boolean
   platformQuotas?: PlatformQuotaItem[] | null
 }>()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const PLATFORM_LABELS: Record<string, string> = {
   anthropic: 'Claude',
@@ -376,7 +376,7 @@ function formatResetTime(iso: string | null | undefined): string {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString(locale.value, {
     month: 'numeric',
     day: 'numeric',
     hour: '2-digit',
@@ -391,7 +391,7 @@ const formatBalance = (b: number) =>
     maximumFractionDigits: 2
   }).format(b)
 
-const formatNumber = (n: number) => n.toLocaleString()
+const formatNumber = (n: number) => n.toLocaleString(locale.value)
 const formatCost = (c: number) => c.toFixed(4)
 const formatTokens = (t: number) => {
   if (t >= 1_000_000) return `${(t / 1_000_000).toFixed(1)}M`

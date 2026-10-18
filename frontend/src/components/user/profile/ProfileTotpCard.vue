@@ -108,7 +108,7 @@ import type { TotpStatus } from '@/types'
 import TotpSetupModal from './TotpSetupModal.vue'
 import TotpDisableDialog from './TotpDisableDialog.vue'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const loading = ref(true)
 const status = ref<TotpStatus | null>(null)
@@ -139,7 +139,7 @@ const handleDisableSuccess = () => {
 const formatDate = (timestamp: number) => {
   // Backend returns Unix timestamp in seconds, convert to milliseconds
   const date = new Date(timestamp * 1000)
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString(locale.value, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

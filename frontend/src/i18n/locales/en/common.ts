@@ -78,6 +78,15 @@ export default {
     saving: 'Saving...',
     selectedCount: '({count} selected)',
     refresh: 'Refresh',
+    accessibility: {
+      closeNotification: 'Close notification',
+      closeModal: 'Close modal',
+      selectOption: 'Select option',
+      clearSelection: 'Clear selection',
+      close: 'Close',
+      pagination: 'Pagination',
+      loading: 'Loading',
+    },
     autoRefresh: {
       title: 'Auto Refresh',
       enable: 'Enable auto refresh',
@@ -391,7 +400,9 @@ export default {
       wechatAvailabilityUnknown: 'WeChat sign-in availability could not be confirmed. Refresh and retry.',
       wechatSystemBrowserOnly: 'This WeChat sign-in flow is only available in your system browser.',
       wechatBrowserOnly: 'This WeChat sign-in flow is only available inside the WeChat browser.',
-      wechatNotConfigured: 'WeChat sign-in is not configured yet.'
+      wechatNotConfigured: 'WeChat sign-in is not configured yet.',
+      wechatNativeAppRequired: 'This site only has WeChat mobile app login configured. Continue from the native app through the WeChat SDK.',
+      wechatNativeAppOnly: 'This WeChat sign-in flow is only available from the native mobile app.'
     },
     linuxdoCallbackPageTitle: 'LinuxDo Sign-In Callback',
     dingtalkCallbackPageTitle: 'DingTalk Sign-In Callback',

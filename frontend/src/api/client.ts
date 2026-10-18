@@ -119,7 +119,11 @@ apiClient.interceptors.response.use(
 
       // Ops monitoring disabled: treat as feature-flagged 404, and proactively redirect away
       // from ops pages to avoid broken UI states.
-      if (status === 404 && apiData.message === 'Ops monitoring is disabled') {
+      if (
+        status === 404 &&
+        (apiData.reason === 'OPS_DISABLED' ||
+          (apiData.reason === undefined && apiData.message === 'Ops monitoring is disabled'))
+      ) {
         try {
           localStorage.setItem('ops_monitoring_enabled_cached', 'false')
         } catch {

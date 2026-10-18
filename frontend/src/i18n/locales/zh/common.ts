@@ -78,6 +78,15 @@ export default {
     saving: '保存中...',
     selectedCount: '（已选 {count} 个）',
     refresh: '刷新',
+    accessibility: {
+      closeNotification: 'Close notification',
+      closeModal: 'Close modal',
+      selectOption: 'Select option',
+      clearSelection: 'Clear selection',
+      close: 'Close',
+      pagination: 'Pagination',
+      loading: 'Loading',
+    },
     autoRefresh: {
       title: '自动刷新',
       enable: '启用自动刷新',
@@ -389,7 +398,9 @@ export default {
       wechatAvailabilityUnknown: '暂时无法确认微信登录可用性，请刷新后重试。',
       wechatSystemBrowserOnly: '当前微信登录流程仅支持在系统浏览器中继续。',
       wechatBrowserOnly: '当前微信登录流程仅支持在微信内置浏览器中继续。',
-      wechatNotConfigured: '微信登录尚未配置。'
+      wechatNotConfigured: '微信登录尚未配置。',
+      wechatNativeAppRequired: '当前仅配置微信移动应用登录，需要在原生 App 中通过微信 SDK 发起授权。',
+      wechatNativeAppOnly: '当前微信登录流程仅支持在原生移动应用中使用。'
     },
     linuxdoCallbackPageTitle: 'LinuxDo 登录回调',
     dingtalkCallbackPageTitle: '钉钉登录回调',
