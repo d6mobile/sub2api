@@ -1,12 +1,16 @@
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
+import { useI18n } from 'vue-i18n'
 
 // t() 回显 key；带参数时附上 JSON，便于断言计数
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
+  const { ref } = await import('vue')
+  const locale = ref('en')
   return {
     ...actual,
     useI18n: () => ({
+      locale,
       t: (key: string, params?: Record<string, unknown>) =>
         params ? `${key}:${JSON.stringify(params)}` : key,
     }),
@@ -16,6 +20,13 @@ vi.mock('vue-i18n', async () => {
 import UserDashboardStats from '../UserDashboardStats.vue'
 import type { UserDashboardStats as UserStatsType, PlatformDashboardStats } from '@/api/usage'
 import type { PlatformQuotaItem } from '@/types'
+
+const { locale } = useI18n()
+
+afterEach(() => {
+  locale.value = 'en'
+  vi.restoreAllMocks()
+})
 
 function makeStats(over: Partial<UserStatsType> = {}): UserStatsType {
   return {
@@ -80,6 +91,43 @@ function mountStats(stats: UserStatsType, platformQuotas: PlatformQuotaItem[] | 
 function cardPlatforms(w: VueWrapper): string[] {
   return w.findAll('[data-testid="platform-card"]').map((c) => c.attributes('data-platform') ?? '')
 }
+
+describe.each(['vi', 'zh', 'en'])('UserDashboardStats locale %s', (currentLocale) => {
+  it('formats total and per-platform request counts with the current locale', () => {
+    locale.value = currentLocale
+    const numberSpy = vi.spyOn(Number.prototype, 'toLocaleString').mockReturnValue('N')
+    const w = mountStats(makeStats({
+      total_requests: 12345,
+      by_platform: [{ ...usage('openai', 0), total_requests: 2345 }],
+    }))
+
+    expect(numberSpy).toHaveBeenCalledTimes(2)
+    expect(numberSpy).toHaveBeenNthCalledWith(1, currentLocale)
+    expect(numberSpy).toHaveBeenNthCalledWith(2, currentLocale)
+    expect(w.text()).toContain('common.total: N')
+    expect(w.get('[data-testid="platform-card"]').text()).toMatch(/dashboard\.requests\s*N/)
+  })
+
+  it('formats quota reset times with the current locale and existing options', () => {
+    locale.value = currentLocale
+    const dateSpy = vi.spyOn(Date.prototype, 'toLocaleString').mockReturnValue('RESET')
+    const w = mountStats(makeStats(), [quota({
+      platform: 'openai',
+      daily_limit_usd: 10,
+      daily_window_resets_at: '2026-10-18T12:00:00Z',
+    })])
+
+    expect(dateSpy).toHaveBeenCalledTimes(1)
+    expect(dateSpy).toHaveBeenCalledWith(currentLocale, {
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+    expect(w.text()).toContain('dashboard.platformQuota.resetsAt:{"time":"RESET"}')
+  })
+})
 
 describe('UserDashboardStats 按平台拆分', () => {
   it('只有用量的平台才产生卡片；三档全空的限额记录不产生卡片', () => {

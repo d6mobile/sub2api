@@ -1,12 +1,18 @@
 import { mount, flushPromises } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ClaudeResetCreditsCell from '../ClaudeResetCreditsCell.vue'
 import type { Account } from '@/types'
 const getCredits = vi.hoisted(() => vi.fn())
 const redeem = vi.hoisted(() => vi.fn())
 vi.mock('@/api/admin/claudeResetCredits', () => ({ getClaudeResetCredits: getCredits, redeemClaudeResetCredit: redeem }))
 const t = vi.hoisted(() => vi.fn((key: string, _params?: Record<string, unknown>) => key))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t }) }))
+const i18n = vi.hoisted(() => ({ locale: { value: 'en' } }))
+vi.mock('vue-i18n', async () => {
+  const { ref } = await import('vue')
+  i18n.locale = ref('en')
+  return { useI18n: () => ({ t, locale: i18n.locale }) }
+})
+afterEach(() => { i18n.locale.value = 'en' })
 // Minimal stand-in exposing the dialog's show state and confirm/cancel events.
 vi.mock('@/components/common/ConfirmDialog.vue', () => ({
   default: {
@@ -41,6 +47,25 @@ async function confirmReset(wrapper: ReturnType<typeof mount>) {
 
 describe('Claude reset credit status', () => {
   beforeEach(() => { getCredits.mockReset(); redeem.mockReset() })
+
+  it.each(['vi', 'zh', 'en'])('formats credit expiry and fetched time with the current UI locale %s', async (locale) => {
+    i18n.locale.value = locale
+    const dateTimeFormat = vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function () {
+      return { format: () => 'X' } as Intl.DateTimeFormat
+    })
+    let wrapper: ReturnType<typeof mount> | undefined
+    try {
+      wrapper = await queried()
+      expect(wrapper.find('[data-testid="claude-reset-expiry"]').exists()).toBe(true)
+      const shortOptions = { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }
+      expect(dateTimeFormat).toHaveBeenCalledWith(locale, shortOptions)
+      expect(dateTimeFormat).toHaveBeenCalledWith(locale, { ...shortOptions, year: 'numeric' })
+      expect(dateTimeFormat.mock.calls.every(([value]) => value === locale)).toBe(true)
+    } finally {
+      wrapper?.unmount()
+      dateTimeFormat.mockRestore()
+    }
+  })
 
   it('queries only on explicit request and shows count and expiry', async () => {
     getCredits.mockResolvedValue(snapshot)

@@ -131,7 +131,7 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 const props = defineProps<{ account: Account }>()
 // Fired after a redemption attempt so the parent can refresh the usage row.
 const emit = defineEmits<{ redeemed: [outcome: ClaudeResetOutcome] }>()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const status = ref<ClaudeResetCredits | null>(null)
 const loading = ref(false)
 const error = ref(false)
@@ -162,7 +162,7 @@ const formatTime = (value: string, style: 'short' | 'full'): string => {
   if (Number.isNaN(date.getTime())) return value
   const options: Intl.DateTimeFormatOptions = { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }
   if (style === 'full') options.year = 'numeric'
-  return new Intl.DateTimeFormat(undefined, options).format(date)
+  return new Intl.DateTimeFormat(locale.value, options).format(date)
 }
 
 // 与 Codex 的「次数」一致：显示持有的剩余次数，而不是此刻可兑换的次数

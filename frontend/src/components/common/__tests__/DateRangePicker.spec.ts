@@ -1,8 +1,15 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 
 import DateRangePicker from '../DateRangePicker.vue'
+
+const mockLocale = ref('en')
+
+afterEach(() => {
+  mockLocale.value = 'en'
+  vi.restoreAllMocks()
+})
 
 const messages: Record<string, string> = {
   'dates.today': 'Today',
@@ -22,7 +29,7 @@ const messages: Record<string, string> = {
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({
     t: (key: string) => messages[key] ?? key,
-    locale: ref('en')
+    locale: mockLocale
   })
 }))
 
@@ -34,6 +41,37 @@ const formatLocalDate = (date: Date): string => {
 }
 
 describe('DateRangePicker', () => {
+  it.each([
+    ['vi', 'vi-VN'],
+    ['zh', 'zh-CN'],
+    ['en', 'en-US']
+  ])('formats custom date labels in %s', async (locale, dateLocale) => {
+    mockLocale.value = locale
+    const toLocaleDateString = vi.spyOn(Date.prototype, 'toLocaleDateString').mockReturnValue('localized date')
+    const wrapper = mount(DateRangePicker, {
+      props: {
+        startDate: '2020-01-02',
+        endDate: '2020-02-03'
+      },
+      global: {
+        stubs: {
+          Icon: true
+        }
+      }
+    })
+
+    try {
+      await nextTick()
+
+      expect(wrapper.find('.date-picker-value').text()).toBe('localized date - localized date')
+      expect(toLocaleDateString).toHaveBeenCalledTimes(2)
+      expect(toLocaleDateString).toHaveBeenNthCalledWith(1, dateLocale, { month: 'short', day: 'numeric' })
+      expect(toLocaleDateString).toHaveBeenNthCalledWith(2, dateLocale, { month: 'short', day: 'numeric' })
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it('uses last 24 hours as the default recognized preset', () => {
     const now = new Date()
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)

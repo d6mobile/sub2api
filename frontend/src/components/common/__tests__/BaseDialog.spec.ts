@@ -34,4 +34,33 @@ describe('BaseDialog', () => {
     expect(document.body.querySelector<HTMLElement>('.modal-body')?.scrollTop).toBe(0)
     wrapper.unmount()
   })
+
+  it('renders the close button with a translated accessible label and emits close once', async () => {
+    const wrapper = mount(BaseDialog, {
+      attachTo: document.body,
+      props: { show: true, title: 'Details' },
+      global: { stubs: { Icon: true } }
+    })
+
+    await nextTick()
+    const closeButton = document.body.querySelector<HTMLButtonElement>('.modal-header button')
+    expect(closeButton).not.toBeNull()
+    expect(closeButton?.getAttribute('aria-label')).toBe('common.accessibility.closeModal')
+
+    closeButton!.click()
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('does not render the close button when showCloseButton is false', async () => {
+    const wrapper = mount(BaseDialog, {
+      attachTo: document.body,
+      props: { show: true, title: 'Details', showCloseButton: false },
+      global: { stubs: { Icon: true } }
+    })
+
+    await nextTick()
+    expect(document.body.querySelector('.modal-header button')).toBeNull()
+    wrapper.unmount()
+  })
 })

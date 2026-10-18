@@ -250,6 +250,7 @@ import TextArea from '@/components/common/TextArea.vue'
 import { Icon } from '@/components/icons'
 import { useClipboard } from '@/composables/useClipboard'
 import { buildApiUrl } from '@/api/client'
+import { getLocale } from '@/i18n'
 import { adminAPI } from '@/api/admin'
 import type { Account, ClaudeModel } from '@/types'
 
@@ -426,7 +427,8 @@ const startTest = async () => {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept-Language': getLocale()
       },
       body: JSON.stringify({
         model_id: selectedModelId.value,
@@ -437,12 +439,24 @@ const startTest = async () => {
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      let message = t('admin.accounts.testHttpStatusError', { status: response.status })
+      try {
+        const payload: unknown = await response.json()
+        if (
+          typeof payload === 'object' && payload !== null &&
+          'message' in payload && typeof payload.message === 'string' && payload.message.length > 0
+        ) {
+          message = payload.message
+        }
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === 'AbortError') throw error
+      }
+      throw new Error(message)
     }
 
     const reader = response.body?.getReader()
     if (!reader) {
-      throw new Error('No response body')
+      throw new Error(t('admin.accounts.legacyTest.noResponseBody'))
     }
 
     const decoder = new TextDecoder()
@@ -476,9 +490,9 @@ const startTest = async () => {
       return
     }
     status.value = 'error'
-    const msg = error instanceof Error ? error.message : 'Unknown error'
+    const msg = error instanceof Error ? error.message : t('admin.accounts.legacyTest.unknownError')
     errorMessage.value = msg
-    addLine(`Error: ${msg}`, 'text-red-400')
+    addLine(t('admin.accounts.legacyTest.errorPrefix', { message: msg }), 'text-red-400')
   }
 }
 
@@ -540,13 +554,13 @@ const handleEvent = (event: {
         status.value = 'success'
       } else {
         status.value = 'error'
-        errorMessage.value = event.error || 'Test failed'
+        errorMessage.value = event.error || t('admin.accounts.legacyTest.testFailed')
       }
       break
 
     case 'error':
       status.value = 'error'
-      errorMessage.value = event.error || 'Unknown error'
+      errorMessage.value = event.error || t('admin.accounts.legacyTest.unknownError')
       if (streamingContent.value) {
         addLine(streamingContent.value, 'text-green-300')
         streamingContent.value = ''

@@ -4,11 +4,21 @@ import { nextTick } from 'vue'
 
 import KeyUsageView from '../KeyUsageView.vue'
 
-const { showInfo, showSuccess, showError, fetchPublicSettings } = vi.hoisted(() => ({
+const { showInfo, showSuccess, showError, fetchPublicSettings, getLocale, mockLocale } = vi.hoisted(() => ({
   showInfo: vi.fn(),
   showSuccess: vi.fn(),
   showError: vi.fn(),
   fetchPublicSettings: vi.fn(),
+  getLocale: vi.fn(() => 'en'),
+  mockLocale: { value: 'en' },
+}))
+
+vi.mock('@/i18n', () => ({ getLocale }))
+vi.mock('@/api/client', () => ({
+  buildGatewayUrl: (path: string) => `/gateway${path}`,
+}))
+vi.mock('@/components/common/LocaleSwitcher.vue', () => ({
+  default: { name: 'LocaleSwitcher', template: '<span />' },
 }))
 
 const messages: Record<string, string> = {
@@ -46,6 +56,9 @@ const messages: Record<string, string> = {
   'keyUsage.limitMonthly': 'Monthly Limit',
   'keyUsage.remainingQuota': 'Remaining Quota',
   'keyUsage.usedQuota': 'Used Quota',
+  'keyUsage.quotaUnitDay': 'D',
+  'keyUsage.quotaUnitWeek': 'W',
+  'keyUsage.quotaUnitMonth': 'M',
   'keyUsage.subscriptionType': 'Subscription Type',
   'keyUsage.billingType': 'Billing Type',
   'keyUsage.todayRequests': 'Today Requests',
@@ -79,7 +92,7 @@ vi.mock('vue-i18n', async () => {
     ...actual,
     useI18n: () => ({
       t: (key: string) => messages[key] ?? key,
-      locale: { value: 'en' },
+      locale: mockLocale,
     }),
   }
 })
@@ -104,12 +117,20 @@ vi.mock('@/stores', () => ({
   }),
 }))
 
+afterEach(() => {
+  mockLocale.value = 'en'
+  messages['keyUsage.quotaUnitDay'] = 'D'
+  messages['keyUsage.quotaUnitWeek'] = 'W'
+  messages['keyUsage.quotaUnitMonth'] = 'M'
+})
+
 describe('KeyUsageView daily detail', () => {
   beforeEach(() => {
     showInfo.mockReset()
     showSuccess.mockReset()
     showError.mockReset()
     fetchPublicSettings.mockReset()
+    getLocale.mockReset().mockReturnValue('en')
     localStorage.clear()
 
     Object.defineProperty(window, 'matchMedia', {
@@ -193,7 +214,7 @@ describe('KeyUsageView daily detail', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/v1/usage?'),
       expect.objectContaining({
-        headers: { Authorization: 'Bearer sk-test-key' },
+        headers: { Authorization: 'Bearer sk-test-key', 'Accept-Language': 'en' },
       })
     )
     expect(String(fetchMock.mock.calls[0][0])).toContain('days=30')
@@ -212,6 +233,267 @@ describe('KeyUsageView daily detail', () => {
     expect(text).toContain('$0.12')
 
     wrapper.unmount()
+  })
+
+  function mountUsageView() {
+    return mount(KeyUsageView, {
+      global: {
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+          LocaleSwitcher: true,
+          Icon: true,
+        },
+      },
+    })
+  }
+
+  it.each([
+    { period: 'daily', unit: 'Ngày' },
+    { period: 'weekly', unit: 'Tuần' },
+    { period: 'monthly', unit: 'Tháng' },
+  ])('translates the $period subscription quota unit', async ({ unit }) => {
+    messages['keyUsage.quotaUnitDay'] = 'Ngày'
+    messages['keyUsage.quotaUnitWeek'] = 'Tuần'
+    messages['keyUsage.quotaUnitMonth'] = 'Tháng'
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        mode: 'wallet',
+        subscription: {
+          daily_limit_usd: 10, daily_usage_usd: 1,
+          weekly_limit_usd: 50, weekly_usage_usd: 5,
+          monthly_limit_usd: 200, monthly_usage_usd: 20,
+        },
+      }),
+    } as Response)
+    const wrapper = mountUsageView()
+
+    try {
+      await wrapper.find('input').setValue('sk-test-key')
+      await wrapper.find('input').trigger('keydown.enter')
+      await flushPromises()
+      await nextTick()
+
+      expect(wrapper.text()).toContain(`Used Quota (${unit})`)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('translates the 1d rate-limit unit without changing other windows', async () => {
+    messages['keyUsage.quotaUnitDay'] = 'Ngày'
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        mode: 'quota_limited',
+        rate_limits: ['5h', '1d', '7d', 'custom'].map(window => ({ window, limit: 10, used: 1 })),
+      }),
+    } as Response)
+    const wrapper = mountUsageView()
+
+    try {
+      await wrapper.find('input').setValue('sk-test-key')
+      await wrapper.find('input').trigger('keydown.enter')
+      await flushPromises()
+      await nextTick()
+
+      for (const unit of ['5H', 'Ngày', '7D', 'custom']) {
+        expect(wrapper.text()).toContain(`Used Quota (${unit})`)
+      }
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it.each([
+    { selectedLocale: 'vi', dateLocale: 'vi-VN', mode: 'quota_limited' },
+    { selectedLocale: 'zh', dateLocale: 'zh-CN', mode: 'quota_limited' },
+    { selectedLocale: 'en', dateLocale: 'en-US', mode: 'quota_limited' },
+    { selectedLocale: 'vi', dateLocale: 'vi-VN', mode: 'wallet' },
+    { selectedLocale: 'zh', dateLocale: 'zh-CN', mode: 'wallet' },
+    { selectedLocale: 'en', dateLocale: 'en-US', mode: 'wallet' },
+  ])('formats $mode expiry dates with $dateLocale for $selectedLocale', async ({ selectedLocale, dateLocale, mode }) => {
+    mockLocale.value = selectedLocale
+    const dateSpy = vi.spyOn(Date.prototype, 'toLocaleDateString').mockReturnValue('localized-expiry')
+    const expires_at = '2030-06-15T12:00:00Z'
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        mode,
+        ...(mode === 'quota_limited' ? { expires_at } : { subscription: { expires_at } }),
+      }),
+    } as Response)
+    const wrapper = mountUsageView()
+
+    try {
+      await wrapper.find('input').setValue('sk-test-key')
+      await wrapper.find('input').trigger('keydown.enter')
+      await flushPromises()
+      await nextTick()
+
+      expect(wrapper.text()).toContain('localized-expiry')
+      expect(dateSpy).toHaveBeenCalledWith(dateLocale, { year: 'numeric', month: 'long', day: 'numeric' })
+    } finally {
+      wrapper.unmount()
+      dateSpy.mockRestore()
+    }
+  })
+
+  it.each(['vi', 'zh', 'en'])('formats usage numbers with getLocale() returning %s', async (selectedLocale) => {
+    getLocale.mockReturnValue(selectedLocale)
+    const numberSpy = vi.spyOn(Number.prototype, 'toLocaleString')
+    const wrapper = mountUsageView()
+
+    try {
+      await wrapper.find('input').setValue('sk-test-key')
+      await wrapper.find('input').trigger('keydown.enter')
+      await flushPromises()
+      await nextTick()
+
+      expect(wrapper.text()).toContain('Token Statistics')
+      expect(numberSpy).toHaveBeenCalledWith(selectedLocale)
+    } finally {
+      wrapper.unmount()
+      numberSpy.mockRestore()
+    }
+  })
+
+  it.each(['en', 'vi', 'zh'])('sends the selected %s locale with the trimmed API key', async (selectedLocale) => {
+    getLocale.mockReturnValue(selectedLocale)
+    localStorage.setItem('auth_token', 'unrelated-session-token-fixture')
+    const wrapper = mountUsageView()
+
+    try {
+      await wrapper.find('input').setValue('  api-key-fixture  ')
+      await wrapper.find('input').trigger('keydown.enter')
+      await flushPromises()
+      await nextTick()
+
+      const fetchMock = vi.mocked(fetch)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/gateway\/v1\/usage\?/),
+        { headers: { Authorization: 'Bearer api-key-fixture', 'Accept-Language': selectedLocale } },
+      )
+      expect(String(fetchMock.mock.calls[0][0])).toContain('days=30')
+      expect(getLocale).toHaveBeenCalledWith()
+      expect(showSuccess).toHaveBeenCalledTimes(1)
+      expect(showSuccess).toHaveBeenCalledWith('Query successful')
+      expect(showError).not.toHaveBeenCalled()
+      expect(localStorage.getItem('auth_token')).toBe('unrelated-session-token-fixture')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('reads locale changes only when querying again in the same mounted instance', async () => {
+    const wrapper = mountUsageView()
+
+    try {
+      await wrapper.find('input').setValue('  api-key-fixture  ')
+      const fetchMock = vi.mocked(fetch)
+
+      for (const [index, selectedLocale] of ['vi', 'zh', 'en'].entries()) {
+        getLocale.mockReturnValue(selectedLocale)
+        await nextTick()
+        await flushPromises()
+        expect(fetchMock).toHaveBeenCalledTimes(index)
+
+        await wrapper.find('input').trigger('keydown.enter')
+        await flushPromises()
+        await nextTick()
+
+        expect(fetchMock).toHaveBeenCalledTimes(index + 1)
+        expect(fetchMock.mock.calls[index]).toStrictEqual([
+          expect.stringMatching(/^\/gateway\/v1\/usage\?/),
+          { headers: { Authorization: 'Bearer api-key-fixture', 'Accept-Language': selectedLocale } },
+        ])
+        expect(String(fetchMock.mock.calls[index][0])).toContain('days=30')
+      }
+
+      expect(getLocale).toHaveBeenCalledWith()
+      expect(showSuccess).toHaveBeenCalledTimes(3)
+      expect(showSuccess).toHaveBeenCalledWith('Query successful')
+      expect(showError).not.toHaveBeenCalled()
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it.each([
+    {
+      name: 'preserves nested error messages ahead of top-level messages',
+      status: 400,
+      body: { error: { message: 'Raw nested error fixture' }, message: 'Different top-level message' },
+      invalidJson: false,
+      message: 'Raw nested error fixture',
+    },
+    {
+      name: 'preserves top-level error messages without a nested message',
+      status: 403,
+      body: { message: 'Raw top-level error fixture' },
+      invalidJson: false,
+      message: 'Raw top-level error fixture',
+    },
+    {
+      name: 'preserves the translated fallback for non-JSON errors',
+      status: 502,
+      body: undefined,
+      invalidJson: true,
+      message: 'Query failed (502)',
+    },
+  ])('$name', async ({ status, body, invalidJson, message }) => {
+    getLocale.mockReturnValue('vi')
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status,
+      json: invalidJson
+        ? vi.fn().mockRejectedValue(new SyntaxError('Non-JSON fixture'))
+        : vi.fn().mockResolvedValue(body),
+    } as unknown as Response)
+    const wrapper = mountUsageView()
+
+    try {
+      await wrapper.find('input').setValue('  api-key-fixture  ')
+      await wrapper.find('input').trigger('keydown.enter')
+      await flushPromises()
+      await nextTick()
+
+      expect(showError).toHaveBeenCalledTimes(1)
+      expect(showError).toHaveBeenCalledWith(message)
+      expect(showSuccess).not.toHaveBeenCalled()
+      expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/gateway\/v1\/usage\?/),
+        { headers: { Authorization: 'Bearer api-key-fixture', 'Accept-Language': 'vi' } },
+      )
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('preserves fetch rejection messages without retrying', async () => {
+    getLocale.mockReturnValue('vi')
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('network-fixture'))
+    const wrapper = mountUsageView()
+
+    try {
+      await wrapper.find('input').setValue('  api-key-fixture  ')
+      await wrapper.find('input').trigger('keydown.enter')
+      await flushPromises()
+      await nextTick()
+
+      expect(showError).toHaveBeenCalledTimes(1)
+      expect(showError).toHaveBeenCalledWith('network-fixture')
+      expect(showSuccess).not.toHaveBeenCalled()
+      expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/gateway\/v1\/usage\?/),
+        { headers: { Authorization: 'Bearer api-key-fixture', 'Accept-Language': 'vi' } },
+      )
+    } finally {
+      wrapper.unmount()
+    }
   })
 
   it('queries the current local calendar date near midnight', async () => {
@@ -242,6 +524,7 @@ describe('KeyUsageView daily detail', () => {
 
 describe('KeyUsageView subscription feature flag', () => {
   beforeEach(() => {
+    getLocale.mockReset().mockReturnValue('en')
     localStorage.clear()
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,

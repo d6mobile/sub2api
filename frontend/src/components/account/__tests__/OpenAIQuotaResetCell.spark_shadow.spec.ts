@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import OpenAIQuotaResetCell from '../OpenAIQuotaResetCell.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
@@ -12,11 +12,15 @@ vi.mock('@/api/admin/accounts', () => ({
   sendOpenAIReferralInvite: vi.fn(),
 }))
 
+const i18n = vi.hoisted(() => ({ locale: { value: 'en' } }))
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
+  const { ref } = await import('vue')
+  i18n.locale = ref('en')
   return {
     ...actual,
     useI18n: () => ({
+      locale: i18n.locale,
       t: (key: string, params?: Record<string, unknown>) =>
         params?.time ? `${key}:${params.time}` : params?.count ? `${key}:${params.count}` : key,
     }),
@@ -64,6 +68,33 @@ const resetButton = (wrapper: ReturnType<typeof mount>) =>
 beforeEach(() => {
   vi.mocked(refreshOpenAIQuota).mockReset()
   vi.mocked(resetOpenAIQuota).mockReset()
+})
+
+afterEach(() => { i18n.locale.value = 'en' })
+
+describe('OpenAIQuotaResetCell date locale', () => {
+  it.each(['vi', 'zh', 'en'])('formats reset credit expiry with the current UI locale %s', (locale) => {
+    i18n.locale.value = locale
+    const dateTimeFormat = vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function () {
+      return { format: () => 'X' } as Intl.DateTimeFormat
+    })
+    let wrapper: ReturnType<typeof mount> | undefined
+    try {
+      wrapper = mount(OpenAIQuotaResetCell, { props: { account: makeAccount({
+        extra: { codex_reset_credit_snapshot: {
+          available_count: 1, credits: [{ expires_at: FUTURE_EXPIRY_EARLY }]
+        } }
+      }) } })
+      expect(wrapper.text()).toContain('admin.accounts.openaiQuotaReset.expiresAt:X')
+      const shortOptions = { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }
+      expect(dateTimeFormat).toHaveBeenCalledWith(locale, shortOptions)
+      expect(dateTimeFormat).toHaveBeenCalledWith(locale, { ...shortOptions, year: 'numeric' })
+      expect(dateTimeFormat.mock.calls.every(([value]) => value === locale)).toBe(true)
+    } finally {
+      wrapper?.unmount()
+      dateTimeFormat.mockRestore()
+    }
+  })
 })
 
 describe('OpenAIQuotaResetCell — Codex 点数', () => {

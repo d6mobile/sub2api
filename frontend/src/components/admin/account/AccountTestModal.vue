@@ -374,6 +374,7 @@ import { Icon } from '@/components/icons'
 import { useClipboard } from '@/composables/useClipboard'
 import { buildApiUrl } from '@/api/client'
 import { ADMIN_UI_REQUEST_HEADER } from '@/api/adminUIRequest'
+import { getLocale } from '@/i18n'
 import { adminAPI } from '@/api/admin'
 import type { Account, ClaudeModel } from '@/types'
 
@@ -886,6 +887,7 @@ const startTest = async () => {
       headers: {
         Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
         'Content-Type': 'application/json',
+        'Accept-Language': getLocale(),
         [ADMIN_UI_REQUEST_HEADER]: '1'
       },
       body: JSON.stringify(requestBody),
@@ -893,7 +895,19 @@ const startTest = async () => {
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      let message = t('admin.accounts.testHttpStatusError', { status: response.status })
+      try {
+        const payload: unknown = await response.json()
+        if (
+          typeof payload === 'object' && payload !== null &&
+          'message' in payload && typeof payload.message === 'string' && payload.message.length > 0
+        ) {
+          message = payload.message
+        }
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === 'AbortError') throw error
+      }
+      throw new Error(message)
     }
 
     const reader = response.body?.getReader()

@@ -1015,7 +1015,68 @@ export default {
         validationRequired: 'Subject and HTML template are required',
         empty: 'No email template events or locales are available yet.',
         noPreview: 'Refresh the preview to see the rendered email subject.',
-        customized: 'Customized'
+        customized: 'Customized',
+        optionalBadge: 'Optional',
+        transactionalBadge: 'Transactional',
+        categoryNotification: 'Notification',
+        categories: {
+          auth: 'Auth',
+          subscription: 'Subscription',
+          billing: 'Billing',
+          admin: 'Admin',
+          riskControl: 'Risk Control',
+          ops: 'Ops'
+        },
+        events: {
+          authVerifyCode: {
+            label: 'Email Verification Code',
+            timing: 'Sent for registration, email binding, OAuth pending email completion, or TOTP email verification.'
+          },
+          authPasswordReset: {
+            label: 'Password Reset',
+            timing: 'Sent when a user requests a password reset link.'
+          },
+          notificationEmailVerifyCode: {
+            label: 'Notification Email Verification',
+            timing: 'Sent when a user adds and verifies an extra notification email address.'
+          },
+          subscriptionPurchaseSuccess: {
+            label: 'Subscription Activated',
+            timing: 'Sent after a subscription order is paid and the subscription is activated or extended.'
+          },
+          subscriptionExpiryReminder: {
+            label: 'Subscription Expiry Reminder',
+            timing: 'Sent by the background job when an active subscription has 7, 3, or 1 day remaining. It can be disabled in Email settings.'
+          },
+          balanceLow: {
+            label: 'Low Balance Alert',
+            timing: "Sent when a user's balance drops below the global or personal reminder threshold."
+          },
+          balanceRechargeSuccess: {
+            label: 'Balance Recharge Success',
+            timing: 'Sent after a balance recharge order is paid and credited.'
+          },
+          accountQuotaAlert: {
+            label: 'Account Quota Alert',
+            timing: 'Sent to admin notification emails when an upstream account reaches the configured quota alert threshold.'
+          },
+          contentModerationViolationNotice: {
+            label: 'Risk Control Violation Notice',
+            timing: 'Sent when a user request triggers content moderation or risk-control rules but the account is not disabled yet.'
+          },
+          contentModerationAccountDisabled: {
+            label: 'Risk Control Account Disabled',
+            timing: 'Sent when content moderation reaches the ban threshold and automatically disables the user account.'
+          },
+          opsAlert: {
+            label: 'Ops Alert',
+            timing: 'Sent to ops recipients when an ops monitoring rule fires and email notification settings allow it.'
+          },
+          opsScheduledReport: {
+            label: 'Ops Scheduled Report',
+            timing: 'Sent when a configured daily, weekly, error digest, or account health report reaches its scheduled send time. Every daily and weekly summary metric is editable in this template.'
+          }
+        }
       },
       opsMonitoring: {
         title: 'Ops Monitoring',
@@ -1198,6 +1259,44 @@ export default {
           force_priority: 'Force priority'
         }
       },
+      loginAgreement: {
+        title: 'Login agreement',
+        description: 'Control whether the login page requires users to accept Markdown policy documents first.',
+        statusDisabled: 'Disabled',
+        displayModeLabel: 'Display mode',
+        modeModal: 'Modal',
+        modeCheckbox: 'Checkbox',
+        modeCheckboxHint: 'The checkbox appears below the login button and gates all login actions.',
+        modeModalHint: 'The modal opens on the login page and gates all login actions until accepted.',
+        updatedAtLabel: 'Updated date',
+        updatedAtHint: 'Changing the date or content requires fresh consent.',
+        documentsTitle: 'Agreement documents',
+        documentsDescription: 'Document titles are customizable and content is saved as Markdown.',
+        addDocument: 'Add document',
+        untitledDocument: 'Untitled document',
+        documentTitleLabel: 'Document title',
+        documentTitlePlaceholder: 'Example: Terms of Service',
+        routeSlugLabel: 'Route slug',
+        markdownContentLabel: 'Markdown content',
+        markdownContentPlaceholder: 'Write the final Markdown content here.',
+        errorDocumentRequired: 'At least one document is required when login agreement is enabled.',
+        errorTitleEmpty: 'Login agreement document title cannot be empty.',
+        errorRouteDuplicate: 'Login agreement document routes cannot be duplicated: /legal/{id}',
+      },
+      emailOAuth: {
+        title: 'Email OAuth Sign-in',
+        description: 'After GitHub or Google email OAuth is enabled, the system reads a verified email, signs in matching users, and auto-registers missing users.',
+        githubHint: 'GitHub OAuth App needs read:user user:email scopes. Use the backend callback URL below.',
+        githubGuidePrefix: 'Setup guide: GitHub Settings → Developer settings →',
+        githubGuideSuffix: '→ New OAuth App. Use your site origin as Homepage URL and the backend callback URL below as Authorization callback URL.',
+        secretConfiguredPlaceholder: 'Secret configured. Leave empty to keep the current value.',
+        backendCallbackUrl: 'Backend Callback URL',
+        generateAndCopy: 'Generate and copy',
+        frontendCallbackUrl: 'Frontend Callback URL',
+        googleHint: 'Google OAuth client needs openid email profile scopes and the backend callback URL registered in credentials.',
+        googleGuide: 'Setup guide: Google Cloud Console → APIs & Services → OAuth consent screen, then Credentials → Create Credentials → OAuth client ID, choose Web application, and add the URL below to Authorized redirect URIs.',
+        callbackUrlSetAndCopied: 'Callback URL set and copied.',
+      },
       wechatConnect: {
         title: 'WeChat Connect',
         description: 'Third-party login configuration for WeChat Open Platform or Official Account / Mini Program.',
@@ -1221,7 +1320,25 @@ export default {
         redirectUrlSetAndCopied: 'Redirect URL generated and copied to clipboard',
         frontendRedirectUrlLabel: 'Frontend redirect URL',
         frontendRedirectUrlPlaceholder: '/auth/wechat/callback',
-        frontendRedirectUrlHint: 'Usually the frontend route callback path; keep it aligned with the backend.'
+        frontendRedirectUrlHint: 'Usually the frontend route callback path; keep it aligned with the backend.',
+        pcAppTitle: "PC App",
+        pcAppDescription: "Desktop browsers sign in through WeChat Open Platform QR login. This can coexist with Official Account or Mobile App.",
+        pcAppIdLabel: "PC App ID",
+        pcAppIdPlaceholder: "WeChat Open Platform PC App ID",
+        pcAppSecretLabel: "PC App Secret",
+        pcAppSecretPlaceholder: "WeChat Open Platform PC App Secret",
+        officialAccountTitle: "Official Account",
+        officialAccountHint: "Only available inside the WeChat browser. It is shown as unavailable outside WeChat.",
+        officialAccountAppIdLabel: "Official Account App ID",
+        officialAccountAppSecretLabel: "Official Account App Secret",
+        mobileAppTitle: "Mobile App",
+        mobileAppHint: "Native mobile clients start authorization through the WeChat SDK. The web UI does not launch this flow directly.",
+        unionIdWarning: "When PC App is enabled together with Official Account or Mobile App, they should belong to the same WeChat Open Platform account so UnionID can merge identities reliably.",
+        browserRedirectUrlLabel: "Browser Redirect URL",
+        browserRedirectUrlHint: "Used by PC App and Official Account browser callbacks. Native mobile SDK flows do not start from this browser callback directly.",
+        mobileAppIdLabel: "Mobile App ID",
+        mobileAppSecretLabel: "Mobile App Secret",
+        mutuallyExclusiveError: "Official Account and Mobile App cannot be enabled at the same time.",
       },
       authSourceDefaults: {
         title: 'Auth Source Defaults',
@@ -1245,6 +1362,15 @@ export default {
           wechat: {
             title: 'WeChat signup',
             description: 'Default quota grants for WeChat signups.'
+          },
+          github: {
+            description: 'Applied on first signup or first bind through a verified GitHub email.'
+          },
+          google: {
+            description: 'Applied on first signup or first bind through a verified Google email.'
+          },
+          dingtalk: {
+            description: 'Applied on first signup or first bind through DingTalk.'
           }
         },
         grantOnFirstBindLabel: 'Grant on first bind',

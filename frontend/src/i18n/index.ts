@@ -1,6 +1,6 @@
 import { createI18n } from 'vue-i18n'
 
-type LocaleCode = 'en' | 'zh'
+type LocaleCode = 'en' | 'zh' | 'vi'
 
 type LocaleMessages = Record<string, any>
 
@@ -9,11 +9,12 @@ const DEFAULT_LOCALE: LocaleCode = 'en'
 
 const localeLoaders: Record<LocaleCode, () => Promise<{ default: LocaleMessages }>> = {
   en: () => import('./locales/en'),
-  zh: () => import('./locales/zh')
+  zh: () => import('./locales/zh'),
+  vi: () => import('./locales/vi')
 }
 
 function isLocaleCode(value: string): value is LocaleCode {
-  return value === 'en' || value === 'zh'
+  return value === 'en' || value === 'zh' || value === 'vi'
 }
 
 function getDefaultLocale(): LocaleCode {
@@ -55,8 +56,18 @@ export async function loadLocaleMessages(locale: LocaleCode): Promise<void> {
 
 export async function initI18n(): Promise<void> {
   const current = getLocale()
-  await loadLocaleMessages(current)
-  document.documentElement.setAttribute('lang', current)
+  await loadLocaleMessages(DEFAULT_LOCALE)
+  let effective = current
+  if (current !== DEFAULT_LOCALE) {
+    try {
+      await loadLocaleMessages(current)
+    } catch (error) {
+      effective = DEFAULT_LOCALE
+      console.warn(`[i18n] Failed to load locale "${current}"; using English.`, error)
+    }
+  }
+  i18n.global.locale.value = effective
+  document.documentElement.setAttribute('lang', effective)
 }
 
 export async function setLocale(locale: string): Promise<void> {
@@ -64,6 +75,7 @@ export async function setLocale(locale: string): Promise<void> {
     return
   }
 
+  await loadLocaleMessages(DEFAULT_LOCALE)
   await loadLocaleMessages(locale)
   i18n.global.locale.value = locale
   localStorage.setItem(LOCALE_KEY, locale)
@@ -93,7 +105,8 @@ export function getLocale(): LocaleCode {
 
 export const availableLocales = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
-  { code: 'zh', name: '中文', flag: '🇨🇳' }
+  { code: 'zh', name: '中文', flag: '🇨🇳' },
+  { code: 'vi', name: 'Tiếng Việt', flag: '🇻🇳' }
 ] as const
 
 export default i18n

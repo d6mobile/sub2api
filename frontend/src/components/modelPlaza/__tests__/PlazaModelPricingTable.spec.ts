@@ -262,7 +262,7 @@ describe('PlazaModelPricingTable', () => {
   it('官方价包含 1h 缓存写入价;official_pricing 为 null 时官方三列显示 -', () => {
     const withOfficial = mountTable([tokenModel()], 1)
     expect(withOfficial.text()).toContain('$6.00')
-    expect(withOfficial.text()).toContain('(1h')
+    expect(withOfficial.text()).toContain('(modelPlaza.table.cacheWrite1hLabel')
 
     const withoutOfficial = mountTable([tokenModel({ official_pricing: null })], 1)
     const cells = withoutOfficial.findAll('tbody td')
@@ -279,7 +279,26 @@ describe('PlazaModelPricingTable', () => {
     const wrapper = mountTable([model], 1)
     expect(wrapper.text()).toContain('$3.75')
     expect(wrapper.text()).toContain('$7.00')
-    expect(wrapper.text()).toContain('(1h')
+    expect(wrapper.text()).toContain('(modelPlaza.table.cacheWrite1hLabel')
+  })
+
+  it('translates the 1h cache write label instead of hard-coding it', () => {
+    const model = tokenModel()
+    model.pricing!.cache_write_1h_price = 7e-6
+
+    const wrapper = mountTable([model], 1)
+    const text = wrapper.text()
+    expect(text).not.toContain('(1h')
+    expect(text).toContain('(modelPlaza.table.cacheWrite1hLabel')
+    // 标签 span 必须保留前后空格,否则价格会与标签粘连成 "(1h$6.00)"
+    const labelSpans = wrapper
+      .findAll('span')
+      .filter((span) => span.element.textContent?.includes('(modelPlaza.table.cacheWrite1hLabel'))
+    expect(labelSpans.length).toBeGreaterThanOrEqual(2)
+    for (const span of labelSpans) {
+      expect(span.element.textContent).toBe(' (modelPlaza.table.cacheWrite1hLabel ')
+    }
+    wrapper.unmount()
   })
 
   it('per_request 模型按单次价 × 倍率展示,官方价列显示 -', () => {
@@ -622,7 +641,7 @@ describe('PlazaModelPricingTable 长上下文阶梯', () => {
     expect(cells[6].text()).toContain('$6.25')
     expect(cells[6].text()).toContain('$12.50')
     expect(cells[6].text()).toContain('$1.00')
-    expect(cells[6].text()).not.toContain('(1h')
+    expect(cells[6].text()).not.toContain('(modelPlaza.table.cacheWrite1hLabel')
   })
 
   it('整单计价的档位标签带 tooltip;边际计价在模型名旁加徽章并换用边际说明', () => {
@@ -660,7 +679,7 @@ describe('PlazaModelPricingTable 长上下文阶梯', () => {
     expect(cells[3].text()).toContain('modelPlaza.table.cacheWrite')
     expect(cells[3].text()).toContain('modelPlaza.table.cacheRead')
     expect(cells[3].findAll('.leading-5')).toHaveLength(0)
-    expect(cells[6].text()).toContain('(1h')
+    expect(cells[6].text()).toContain('(modelPlaza.table.cacheWrite1hLabel')
   })
 })
 

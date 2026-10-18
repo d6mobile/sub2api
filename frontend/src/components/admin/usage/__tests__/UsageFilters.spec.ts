@@ -7,6 +7,9 @@ import UsageFilters from '../UsageFilters.vue'
 const messages: Record<string, string> = {
   'admin.usage.userDeletedBadge': 'deleted',
   'admin.usage.userFilter': 'User',
+  'admin.usage.clearUserFilter': 'Xóa bộ lọc người dùng',
+  'admin.usage.clearApiKeyFilter': 'Xóa bộ lọc khóa API',
+  'admin.usage.clearAccountFilter': 'Xóa bộ lọc tài khoản',
   'admin.usage.searchUserPlaceholder': 'Search user...',
   'usage.apiKeyFilter': 'API Key',
   'admin.usage.searchApiKeyPlaceholder': 'Search API key...',
@@ -232,6 +235,31 @@ describe('UsageFilters — user search dropdown', () => {
     pendingSearch.resolve([{ id: 3, email: 'stale@test.com', deleted: false }])
     await flushPromises()
     expect(wrapper.text()).not.toContain('stale@test.com')
+  })
+})
+
+describe('UsageFilters — accessible clear filter labels', () => {
+  it('labels the clear buttons for selected user, API key, and account filters', async () => {
+    const wrapper = mountFilters()
+    await wrapper.setProps({
+      modelValue: {
+        ...defaultFilters(),
+        user_id: 1,
+        api_key_id: 2,
+        account_id: 3,
+      },
+    })
+
+    expect(
+      wrapper.findAll('.usage-filter-dropdown button[aria-label]')
+        .map((button) => button.attributes('aria-label'))
+    ).toEqual([
+      messages['admin.usage.clearUserFilter'],
+      messages['admin.usage.clearApiKeyFilter'],
+      messages['admin.usage.clearAccountFilter'],
+    ])
+
+    wrapper.unmount()
   })
 })
 

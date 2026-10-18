@@ -48,6 +48,7 @@ export default {
     noUsageRecords: '暂无使用记录',
     startUsingApi: '开始使用 API 后，您的使用历史将显示在这里。',
     viewAllUsage: '查看全部',
+    tokensCount: '{count} tokens',
     quickActions: '快捷操作',
     createApiKey: '创建 API 密钥',
     generateNewKey: '生成新的 API 密钥',
@@ -177,6 +178,8 @@ export default {
         noteWindows:
           '按 Win+R，输入 %userprofile%\\.codex 打开配置目录。如目录不存在，请先手动创建。'
       },
+      clientNavLabel: 'Client',
+      tabsNavLabel: 'Tabs',
       cliTabs: {
         claudeCode: 'Claude Code',
         geminiCli: 'Gemini CLI',
@@ -689,6 +692,7 @@ export default {
       cacheRead: '读取',
       cacheWriteShort: '写',
       cacheReadShort: '读',
+      cacheWrite1hLabel: '1h',
       tierHint: '按单次请求的总上下文（输入 + 缓存写入 + 缓存读取）所在档位对整单计价',
       tierHintMarginal: '仅超过阈值的部分按该档计价，输出不加价',
       reasoningMultiplierBadge: '{effort} ×{multiplier}',
